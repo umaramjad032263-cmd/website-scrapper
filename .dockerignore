@@ -1,0 +1,6 @@
+node_modules
+.git
+.gemini
+*.log
+__pycache__
+.env

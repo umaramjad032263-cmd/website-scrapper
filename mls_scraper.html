@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MLS Property Extractor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #030712;
+            --card: #111827;
+            --accent: #6366f1;
+            --accent-glow: rgba(99, 102, 241, 0.2);
+            --text: #f9fafb;
+            --text-muted: #9ca3af;
+            --success: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p {
+            color: var(--text-muted);
+        }
+
+        .search-box {
+            background: var(--card);
+            padding: 30px;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            margin-bottom: 30px;
+        }
+
+        .mode-toggle {
+            display: flex;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 4px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            width: fit-content;
+        }
+
+        .mode-btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            color: var(--text-muted);
+        }
+
+        .mode-btn.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 12px;
+        }
+
+        .manual-input {
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 16px;
+            border-radius: 12px;
+            color: white;
+            font-family: inherit;
+            resize: none;
+            outline: none;
+        }
+
+        textarea:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px var(--accent-glow);
+        }
+
+        input {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 16px 20px;
+            border-radius: 12px;
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--accent);
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 0 4px var(--accent-glow);
+        }
+
+        button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0 30px;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        button.main-btn {
+            height: 54px;
+        }
+
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .results {
+            display: none;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .property-header {
+            background: linear-gradient(135deg, #1e1b4b, #111827);
+            padding: 24px;
+            border-radius: 20px;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            margin-bottom: 20px;
+        }
+
+        .price {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--success);
+        }
+
+        .addr {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            /* Stack them for better readability */
+            gap: 12px;
+        }
+
+        .detail-item {
+            background: var(--card);
+            padding: 16px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .value {
+            font-weight: 600;
+        }
+
+        .loader {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(99, 102, 241, 0.1);
+            border-top: 4px solid var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>MLS Scraper</h1>
+            <p>Paste a Bright MLS link or HTML code to extract all building data</p>
+        </header>
+
+        <div class="search-box">
+            <div class="mode-toggle">
+                <div class="mode-btn active" id="btn-auto" onclick="setMode('auto')">Python Engine (Auto)</div>
+                <div class="mode-btn" id="btn-manual" onclick="setMode('manual')">Paste HTML</div>
+            </div>
+
+            <div id="auto-group" class="input-group" style="flex-direction: column; gap: 15px;">
+                <input type="text" id="mls-url" placeholder="Paste Link..."
+                    value="https://matrix.brightmls.com/DAE.asp?ID=0-6721608503-10&eml=c2FsZXNAdXBvbnRoZXJvb2ZzLmNvbQ=="
+                    style="width: 100%;">
+
+                <button class="main-btn" id="scrape-btn" onclick="startScrape()" style="width: 100%;">Start Human-Like
+                    Extraction</button>
+            </div>
+
+            <div id="manual-group" class="manual-input">
+                <p style="font-size: 0.8rem; margin-bottom: 8px; color: var(--accent);">Use this if the Auto Scan keeps
+                    failing</p>
+                <p style="font-size: 0.8rem; margin-bottom: 8px;">1. Open link in browser. 2. Ctrl+U (View Source). 3.
+                    Copy/Paste code here.</p>
+                <textarea id="mls-html" placeholder="Paste HTML Source Code here..." style="height: 200px;"></textarea>
+                <button class="main-btn" onclick="processManualHtml()" style="margin-top: 10px;">Process HTML
+                    Manually</button>
+            </div>
+        </div>
+
+        <div class="loader" id="loader">
+            <div class="spinner"></div>
+            <p id="loader-text">Scanning property details... hold on tight.</p>
+        </div>
+
+        <div class="results" id="results">
+            <div id="prop-count" style="margin-bottom: 20px; font-weight: 600; color: var(--accent); font-size: 1.1rem; border-bottom: 1px solid #333; padding-bottom: 15px;">
+                Found <span id="count-num">0</span> Properties
+            </div>
+            <div class="property-header" style="display: none;">
+                <div class="price" id="res-price">$0</div>
+                <div class="addr" id="res-addr">Address</div>
+            </div>
+            <div class="details-grid" id="res-grid">
+                <!-- Items injected here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentMode = 'auto';
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.getElementById('btn-auto').classList.toggle('active', mode === 'auto');
+            document.getElementById('btn-manual').classList.toggle('active', mode === 'manual');
+            document.getElementById('auto-group').style.display = mode === 'auto' ? 'flex' : 'none';
+            document.getElementById('manual-group').style.display = mode === 'manual' ? 'flex' : 'none';
+        }
+
+        function displayData(data) {
+            const grid = document.getElementById('res-grid');
+            grid.innerHTML = ''; // Clear old results
+
+            const rawListings = data.all_data || [data.data];
+
+            // Strict Filter: Don't show $0 ghosts or placeholder addresses
+            const listings = rawListings.filter(p =>
+                p.price !== "$0" &&
+                p.address.toLowerCase() !== "address" &&
+                p.address.toLowerCase() !== "check source"
+            );
+
+            listings.forEach(prop => {
+                const card = document.createElement('div');
+                card.className = 'property-header';
+                card.style.marginBottom = "20px";
+                card.innerHTML = `
+                    <div class="price">${prop.price}</div>
+                    <div class="addr">${prop.address}</div>
+                    <div style="font-size: 0.8rem; color: #9ca3af; margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+                        <div><b>MLS:</b> ${prop.mls}</div>
+                        <div><b>Status:</b> ${prop.status}</div>
+                        <div><b>Type:</b> ${prop.type}</div>
+                        <div><b>Beds/Baths:</b> ${prop.beds || 'N/A'} / ${prop.baths || 'N/A'}</div>
+                        <div><b>City:</b> ${prop.city}</div>
+                        <div><b>SqFt:</b> ${prop.sqft}</div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+
+            document.getElementById('count-num').innerText = listings.length;
+            document.getElementById('results').style.display = 'block';
+        }
+
+        async function startScrape() {
+            const url = document.getElementById('mls-url').value;
+            const useProxy = true; // Use Webshare proxies by default
+            const manualProxy = "";
+
+            if (!url) return alert("Please enter a URL");
+
+            const btn = document.getElementById('scrape-btn');
+            const loader = document.getElementById('loader');
+            const lText = document.getElementById('loader-text');
+            const results = document.getElementById('results');
+
+            btn.disabled = true;
+            results.style.display = 'none';
+            loader.style.display = 'block';
+            lText.innerHTML = "Verifying Webshare Proxies... <br><span style='font-size:0.7rem; color:var(--accent)'>This takes ~45s to bypass advanced security.</span>";
+
+            const apiBase = (window.location.port && window.location.port !== "3005") 
+                ? "http://localhost:3005" 
+                : "";
+
+            try {
+                const response = await fetch(`${apiBase}/scrape`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, useProxy, manualProxy })
+                });
+
+                const data = await response.json();
+
+                // Server-side error (e.g. 500 error or custom error message)
+                if (data.status === "error" || data.error) {
+                    throw new Error(data.message || data.error || "Unknown server error");
+                }
+
+                // Verify data structure before calling display
+                if (data && (data.success && data.all_data)) {
+                    displayData(data);
+                } else {
+                    console.error("Invalid data received:", data);
+                    throw new Error("Received invalid data structure from server");
+                }
+            } catch (err) {
+                const errorMsg = err.message || "Unknown error";
+                alert("Scrape Failed: " + errorMsg + (err.details ? "\n\nDetails: " + err.details : ""));
+            } finally {
+                btn.disabled = false;
+                loader.style.display = 'none';
+            }
+        }
+
+        function processManualHtml() {
+            const html = document.getElementById('mls-html').value;
+            if (!html) return alert("Please paste HTML source code");
+
+            try {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, "text/html");
+                const text = doc.body.innerText;
+
+                const priceRegex = /\$\d{1,3}(,\d{3})*(\.\d{2})?/g;
+                const priceMatches = [...text.matchAll(priceRegex)];
+                
+                if (priceMatches.length === 0) throw new Error("No properties found (could not find price symbols).");
+
+                const all_data = priceMatches.map((match, index) => {
+                    const price = match[0];
+                    const start = match.index;
+                    const end = index + 1 < priceMatches.length ? priceMatches[index + 1].index : text.length;
+                    const block = text.substring(start, end);
+
+                    const mlsMatch = block.match(/([A-Z]{4}\d{7})/);
+                    
+                    // Refined Address Match with Unit Number Support
+                    const addrMatch = block.match(/(\d{1,5}\s+(?!Beds|Bedroom|Acres|Welcome|Listing)[A-Z0-9\.\s-]{2,40}(St|Rd|Ave|Blvd|Dr|Ln|Way|Ct|Pl|Cir|Cambr|Pike|Hwy|Vogdes|Master|Keswick|Cambria|Umbria)(?:\s+(?:#|Unit|Ste|Apt)\s*[A-Z0-9\-]+)?)/i);
+                    let address = addrMatch ? addrMatch[0].trim() : 'Address Pending';
+                    
+                    if (address !== 'Address Pending') {
+                        // Suffix Cleaning: Cut off at city or property features
+                        address = address.split(/Philadelphia|Residential|Beds|bd|Baths|ba|\$|\|/i)[0].trim();
+                        address = address.replace(/^[^a-zA-Z0-9#]+/, '').trim();
+                    }
+
+                    const statusMatch = block.match(/(Coming Soon|Active Under Contract|Active|Pending|Closed|Withdrawn|Expired|Cancelled)/i);
+                    const bedsMatch = block.match(/(\d+)\s*(?:Beds|bd)/i);
+                    const bathsMatch = block.match(/(\d+\/?\d*)\s*(?:Baths|ba)/i);
+                    const sqftMatch = block.match(/([\d,]+)\s*(?:SqFt|SQFT|sq\s*ft)/i);
+
+                    return {
+                        price: price,
+                        address: address,
+                        mls: mlsMatch ? mlsMatch[0] : 'Scanning...',
+                        status: statusMatch ? statusMatch[0] : 'Active',
+                        type: 'Residential',
+                        city: text.toLowerCase().includes('philadelphia') ? 'Philadelphia, PA' : 'Local',
+                        sqft: sqftMatch ? sqftMatch[1] : 'N/A',
+                        beds: bedsMatch ? bedsMatch[1] : 'N/A',
+                        baths: bathsMatch ? bathsMatch[1] : 'N/A',
+                        sender: 'Manual Import'
+                    };
+                });
+
+                const unique = Array.from(new Set(all_data.map(p => p.mls))).map(mls => all_data.find(p => p.mls === mls));
+                displayData({ all_data: unique });
+            } catch (err) {
+                alert("Processing Error: " + err.message);
+            }
+        }
+    </script>
+</body>
+
+</html>

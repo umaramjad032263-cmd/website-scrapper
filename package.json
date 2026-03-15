@@ -1,0 +1,24 @@
+{
+    "name": "philly-property-intelligence",
+    "version": "1.0.0",
+    "description": "Philadelphia Property Intelligence Dashboard & Webhook",
+    "type": "module",
+    "scripts": {
+        "start": "node scraper_server.js",
+        "build": "./render-build.sh"
+    },
+    "dependencies": {
+        "@turf/turf": "^7.2.0",
+        "axios": "^1.13.6",
+        "cheerio": "^1.2.0",
+        "chromium-bidi": "^15.0.0",
+        "cors": "^2.8.6",
+        "express": "^5.2.1",
+        "playwright-chromium": "^1.58.2",
+        "playwright-extra": "^4.3.6",
+        "proj4": "^2.11.0",
+        "puppeteer-core": "^24.39.1",
+        "puppeteer-extra-plugin-stealth": "^2.11.2",
+        "pureimage": "^0.4.18"
+    }
+}
