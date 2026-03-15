@@ -178,36 +178,34 @@ def clean_address_string(address):
 async def perform_scrape(p_instance, url, proxy_config=None):
     ua = UserAgent()
     print("STATUS: Data-Hunter Engine active. Starting full-length scan...", file=sys.stderr)
-    is_server = "SPACE_ID" in os.environ or "RENDER" in os.environ
+    print("STATUS: Data-Hunter Engine active. Starting full-length scan...", file=sys.stderr)
+    # Detect if on a server (Render, Railway, Space)
+    is_server = "SPACE_ID" in os.environ or "RENDER" in os.environ or "RAILWAY_ENVIRONMENT_ID" in os.environ
     
     browser = None
     try:
+        # Force Headless on servers or if headless requested
         browser = await p_instance.chromium.launch(
-            headless=True if is_server else False, 
+            headless=True if is_server else False,
             args=["--disable-blink-features=AutomationControlled", "--no-sandbox", "--disable-dev-shm-usage", "--no-zygote"], 
             proxy=proxy_config
         )
-
-        context = await browser.new_context(user_agent=ua.chrome)
-        await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-        page = await context.new_page()
-        await page.set_viewport_size({"width": 1280, "height": 900})
-        
-        print(f"STATUS: Accessing Portal...", file=sys.stderr)
         
         # 403 Stealth Retry Loop
         max_retries = 3
         success = False
+        page = None
         for attempt in range(max_retries):
             try:
-                # 1. Advanced Stealth Context
+                # 1. Advanced Stealth Context (Always use browser proxy)
                 ua_str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
                 context = await browser.new_context(
                     user_agent=ua_str,
                     viewport={"width": random.randint(1280, 1920), "height": random.randint(720, 1080)},
                     device_scale_factor=1,
                     is_mobile=False,
-                    has_touch=False
+                    has_touch=False,
+                    proxy=proxy_config
                 )
                 page = await context.new_page()
                 
