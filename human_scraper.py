@@ -14,36 +14,6 @@ from fake_useragent import UserAgent
 sys.stdout.reconfigure(encoding='utf-8')
 sys.stderr.reconfigure(encoding='utf-8')
 
-def load_webshare_proxies():
-    proxies = []
-    # Check Environment Variable first (For Render/Docker)
-    env_proxies = os.environ.get("PROXY_LIST")
-    
-    lines = []
-    if env_proxies:
-        # Clean up common copy-paste artifacts like quotes
-        clean_env = env_proxies.strip().replace('"', '').replace("'", "")
-        lines = re.split(r'[\n\r,]+', clean_env)
-    else:
-        # Fallback to local file
-        file_path = "Webshare 10 proxies.txt"
-        if os.path.exists(file_path):
-            try:
-                with open(file_path, "r", encoding='utf-8') as f:
-                    lines = f.readlines()
-            except: pass
-
-    for line in lines:
-        line = line.strip()
-        if not line or ":" not in line: continue
-        parts = line.split(":")
-        if len(parts) >= 4:
-            proxies.append({
-                "server": f"http://{parts[0]}:{parts[1]}",
-                "username": parts[2],
-                "password": parts[3]
-            })
-    return proxies
 def extract_all_listings(html):
     if not html or len(html) < 200: return []
     soup = BeautifulSoup(html, "html.parser")
@@ -179,67 +149,145 @@ def clean_address_string(address):
     address = re.sub(r'^[^a-zA-Z0-9#]+', '', address).strip()
     return address
 
-async def perform_scrape(p_instance, url, proxy_config=None):
+async def perform_scrape(p_instance, url):
     ua = UserAgent()
     print("STATUS: Data-Hunter Engine active. Starting full-length scan...", file=sys.stderr)
-    print("STATUS: Data-Hunter Engine active. Starting full-length scan...", file=sys.stderr)
-    # Detect if on a server (Render, Railway, Space)
-    is_server = "SPACE_ID" in os.environ or "RENDER" in os.environ or "RAILWAY_ENVIRONMENT_ID" in os.environ
-    proxy_pool = load_webshare_proxies() if not proxy_config else [proxy_config]
+    
     all_results = []
     
     browser = None
     try:
-        # Launch browser with maximum RAM-saving args for Railway/low-tier VPS
-        chrome_args = [
-            "--disable-blink-features=AutomationControlled",
-            "--no-sandbox",
-            "--disable-dev-shm-usage",
-            "--no-zygote",
-            "--disable-gpu",
-            "--disable-extensions",
-            "--disable-features=IsolateOrigins,site-per-process",
-            "--js-flags=--max-old-space-size=256"
-        ]
-        
-        browser = await p_instance.chromium.launch(
-            headless=True if is_server else False,
-            args=chrome_args
+        browser = await p_instance.chromium.launch_persistent_context(
+            user_data_dir=os.path.abspath("browser_profile"),
+            headless=False, # Extensions ONLY work in non-headless mode
+            args=[
+                f"--disable-extensions-except={os.path.abspath('browser_ext/browsec')}",
+                f"--load-extension={os.path.abspath('browser_ext/browsec')}",
+                "--no-sandbox",
+                "--disable-dev-shm-usage"
+            ]
         )
+        
+        page = browser.pages[0] if browser.pages else await browser.new_page()
         
         # 403 Stealth Retry Loop
         max_retries = 3
         success = False
-        page = None
-        for attempt in range(max_retries):
-            current_proxy = random.choice(proxy_pool) if proxy_pool else None
+        
+        # 0. AUTOMATIC VPN ACTIVATION
+        print("STATUS: Triggering Automatic VPN Shield...", file=sys.stderr)
+        try:
+            # Using the ID found on system: omghfjlpggmjjaagoclmmobgdodcjboh
+            await page.goto("chrome-extension://omghfjlpggmjjaagoclmmobgdodcjboh/popup/popup.html", timeout=15000)
+            await asyncio.sleep(5) 
+            
+            # Step 0: Bypass Terms & Conditions if present
             try:
-                # 1. Advanced Stealth Context
-                ua_str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-                context = await browser.new_context(
-                    user_agent=ua_str,
-                    viewport={"width": 1024, "height": 768}, # Smaller viewport saves RAM
-                    device_scale_factor=1,
-                    is_mobile=False,
-                    has_touch=False,
-                    proxy=current_proxy
-                )
-                page = await context.new_page()
+                # The Accept button is an input[type='button'] inside the shadow root of first-start-agree-terms-conditions
+                terms_accept = await page.query_selector("first-start-agree-terms-conditions >> input[type='button']")
+                if terms_accept:
+                    print("STATUS: Accepting VPN Terms & Conditions...", file=sys.stderr)
+                    await terms_accept.click()
+                    await asyncio.sleep(2)
+            except: pass
+
+            # Step 1: Handle Start Tips (Onboarding Tooltips)
+            try:
+                tips_close = await page.query_selector("first-start-tips-start-vpn >> .Close")
+                if tips_close:
+                    print("STATUS: Dismissing onboarding tips...", file=sys.stderr)
+                    await tips_close.click()
+                    await asyncio.sleep(1)
+            except: pass
+
+            # Step 2: Ensure Location is United States
+            is_active = await page.query_selector("text=Your privacy is protected")
+            is_us = await page.query_selector("text=United States")
+            
+            if is_active and is_us:
+                print("STATUS: VPN Shield already active and set to United States.", file=sys.stderr)
+            else:
+                print("STATUS: Selecting United States location...", file=sys.stderr)
+                # Try to open location list
+                change_btn = await page.query_selector("text=Change")
+                if not change_btn:
+                    change_btn = await page.query_selector("active-country")
                 
-                # 2. Automation Mask
+                if change_btn:
+                    await change_btn.click()
+                    await asyncio.sleep(2)
+                    # Select US from list
+                    us_option = await page.query_selector("text=United States")
+                    if us_option:
+                        await us_option.click()
+                        await asyncio.sleep(5)
+                
+                # If not active yet, click the big button
+                if not await page.query_selector("text=Your privacy is protected"):
+                    start_btn = await page.query_selector("text=Protect me")
+                    if start_btn:
+                        await start_btn.click()
+                        await asyncio.sleep(5)
+            
+            # Final verification
+            if await page.query_selector("text=Your privacy is protected"):
+                 print("STATUS: VPN Shield Secured.", file=sys.stderr)
+            else:
+                 print("WARNING: VPN Shield status uncertain.", file=sys.stderr)
+            
+            await asyncio.sleep(2)
+        except Exception as vpn_e:
+            print(f"WARNING: VPN Auto-Start failed: {str(vpn_e)}", file=sys.stderr)
+
+        for attempt in range(max_retries):
+            # We don't need proxy_pool anymore as we use the extension
+            try:
+                # 2. Automation Mask 
                 await page.add_init_script("""() => {
                     Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
                 }""")
                 
-                print(f"STATUS: Accessing Portal (Attempt {attempt+1} via {current_proxy['server'] if current_proxy else 'Direct'})...", file=sys.stderr)
+                print(f"STATUS: Accessing Portal (Attempt {attempt+1} via VPN/Direct)...", file=sys.stderr)
+                
+                # Verify Location
+                try:
+                    ip_check = await page.goto("https://ipapi.co/json/", timeout=10000)
+                    if ip_check and ip_check.status == 200:
+                        ip_data = await ip_check.json()
+                        print(f"STATUS: Verified Location: {ip_data.get('city')}, {ip_data.get('country_name')} (IP: {ip_data.get('ip')})", file=sys.stderr)
+                except:
+                    print("STATUS: Could not verify location via IP API, proceeding anyway...", file=sys.stderr)
+
                 response = await page.goto(url, wait_until="domcontentloaded", timeout=60000)
-                await asyncio.sleep(random.uniform(8, 12)) # Longer wait for slow cloud proxies
+                await asyncio.sleep(random.uniform(2, 4))
+                
+                # Humanize: Move mouse around
+                await page.mouse.move(random.randint(100, 500), random.randint(100, 500))
+                await asyncio.sleep(random.uniform(1, 2))
+
+                if not response:
+                    print(f"WARNING: No response from attempt {attempt+1}. Body might be empty.", file=sys.stderr)
+                    await context.close()
+                    continue
+
+                print(f"DEBUG: Page Status: {response.status}", file=sys.stderr)
+                
+                if response.status == 402:
+                    print(f"ERROR: Proxy returned 402 (Payment Required). Rotating...", file=sys.stderr)
+                    continue
                 
                 # 3. Block Detection & Content Verification
                 page_content = await page.content()
                 page_title = await page.title()
-                if response.status == 403 or "Forbidden" in page_content or "Access Denied" in page_content:
-                    print(f"WARNING: Attempt {attempt+1} blocked (403). Rotating proxy...", file=sys.stderr)
+                
+                # REFINED BLOCK DETECTION: Check for both status codes AND body text
+                is_blocked = (response.status == 403 or 
+                              "Forbidden" in page_content or 
+                              "Access Denied" in page_content or 
+                              "security challenge" in page_content.lower())
+                
+                if is_blocked:
+                    print(f"WARNING: Attempt {attempt+1} blocked (403/Security). Rotating proxy...", file=sys.stderr)
                     await context.close()
                     continue
                 
@@ -353,10 +401,8 @@ async def main():
     try:
         url = sys.argv[1] if len(sys.argv) > 1 else ""
         if not url: return
-        use_proxy = "--proxy" in sys.argv
-        
         async with async_playwright() as p:
-            # Proxies are now handled inside perform_scrape for better rotation
+            # VPN is handled inside perform_scrape via Browsec extension
             results = await perform_scrape(p, url)
             if results and isinstance(results, list):
                 print(json.dumps({"success": True, "count": len(results), "data": results[0], "all_data": results}))

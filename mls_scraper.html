@@ -268,6 +268,11 @@
                     value="https://matrix.brightmls.com/DAE.asp?ID=0-6721608503-10&eml=c2FsZXNAdXBvbnRoZXJvb2ZzLmNvbQ=="
                     style="width: 100%;">
 
+                <div style="display: flex; align-items: center; gap: 10px; font-size: 0.9rem; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 10px 15px; border-radius: 10px; border: 1px solid rgba(16, 185, 129, 0.2);">
+                    <span style="font-weight: 600;">🛡️ VPN Protection Active:</span>
+                    <span>Automated US-based connection secured.</span>
+                </div>
+
                 <button class="main-btn" id="scrape-btn" onclick="startScrape()" style="width: 100%;">Start Human-Like
                     Extraction</button>
             </div>
@@ -351,8 +356,6 @@
 
         async function startScrape() {
             const url = document.getElementById('mls-url').value;
-            const useProxy = true; // Use Webshare proxies by default
-            const manualProxy = "";
 
             if (!url) return alert("Please enter a URL");
 
@@ -364,7 +367,7 @@
             btn.disabled = true;
             results.style.display = 'none';
             loader.style.display = 'block';
-            lText.innerHTML = "Verifying Webshare Proxies... <br><span style='font-size:0.7rem; color:var(--accent)'>This takes ~45s to bypass advanced security.</span>";
+            lText.innerHTML = "Initializing VPN Shield... <br><span style='font-size:0.7rem; color:var(--accent)'>Securing US-based connection for stealth extraction.</span>";
 
             const apiBase = (window.location.port && window.location.port !== "3005") 
                 ? "http://localhost:3005" 
@@ -377,7 +380,7 @@
                 const response = await fetch(`${apiBase}/scrape`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url, useProxy, manualProxy })
+                    body: JSON.stringify({ url })
                 });
 
                 const data = await response.json();

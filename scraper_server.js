@@ -35,21 +35,18 @@ app.post('/scrape', async (req, res) => {
     // Increase response timeout for this specific long-running request
     req.setTimeout(300000); // 5 minutes
 
-    const { url, useProxy, manualProxy } = req.body;
+    const { url } = req.body;
     if (!url) return res.status(400).json({ error: "URL is required" });
 
     console.log(`\n--------------------------------`);
     console.log(`📡 Incoming Scrape Request [${new Date().toLocaleTimeString()}]:`);
     console.log(`🔗 URL: ${url}`);
-    console.log(`🛡️ Proxy: ${useProxy ? 'YES' : 'NO'}`);
     console.log(`--------------------------------\n`);
 
     try {
         // Use python3 for linux-based servers like Railway/Render
         const pythonCmd = process.env.RENDER || process.env.RAILWAY_ENVIRONMENT_ID ? "python3" : "python";
         let command = `${pythonCmd} human_scraper.py "${url}"`;
-        if (useProxy) command += " --proxy";
-        if (manualProxy) command += ` --manual-proxy "${manualProxy.replace(/"/g, '')}"`;
 
         console.log(`🚀 Launching Python Stealth Engine [${pythonCmd}]...`);
         const { stdout, stderr } = await execPromise(command, { timeout: 240000 });
